@@ -1,0 +1,20 @@
+cat << 'EOF' > .gitignore
+# Kernel module build files
+*.o
+*.ko
+*.mod.*
+*.mod
+*.cmd
+*.symvers
+*.order
+.tmp_versions/
+
+# Python cache & environment
+__pycache__/
+*.pyc
+.env
+.DS_Store
+EOF
+
+# Бусад гишүүдийн файл орох хавтаснуудыг Git-д бүртгүүлэх
+touch src/static/.gitkeep tests/.gitkeep docs/.gitkeep
