@@ -2,11 +2,11 @@
 /*
  * ti_walk.c - task information report (Member 2)
  *
- * This first implementation reports the selected task and its parent.
- * Ancestor and child traversal is added in a follow-up change.
+ * Reports the selected task, its parent, ancestors, and child processes.
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <linux/pid.h>
 #include <linux/rcupdate.h>
 #include <linux/version.h>
@@ -50,9 +50,11 @@ static const char *ti_state_name(struct task_struct *task)
 
 int ti_build_report(pid_t pid, char *buf, size_t size)
 {
-	struct task_struct *task, *parent;
+	struct task_struct *task, *parent, *process;
+	struct task_struct *ancestors[TI_MAX_ANCESTORS];
 	char command[TASK_COMM_LEN], parent_command[TASK_COMM_LEN];
-	int len = 0;
+	int ancestor_count = 0, child_count = 0, shown_children = 0;
+	int i, len = 0;
 
 	rcu_read_lock();
 
@@ -75,6 +77,55 @@ int ti_build_report(pid_t pid, char *buf, size_t size)
 	} else {
 		EMIT("ppid = [0] parent_command = [-]\n");
 	}
+
+	{
+		struct task_struct *current = task;
+
+		while (ancestor_count < TI_MAX_ANCESTORS) {
+			parent = rcu_dereference(current->real_parent);
+			if (!parent || parent == current ||
+			    task_tgid_vnr(parent) == 0)
+				break;
+			ancestors[ancestor_count++] = parent;
+			current = parent;
+		}
+	}
+
+	for_each_process(process) {
+		struct task_struct *real_parent =
+			rcu_dereference(process->real_parent);
+
+		if (process != task->group_leader && real_parent &&
+		    real_parent->tgid == task->tgid)
+			child_count++;
+	}
+	EMIT("nchildren = [%d]\n", child_count);
+
+	for (i = ancestor_count - 1; i >= 0; i--) {
+		get_task_comm(parent_command, ancestors[i]);
+		EMIT("ancestor: pid = [%d] command = [%s] state = [%u]\n",
+		     task_tgid_vnr(ancestors[i]), parent_command,
+		     ti_state(ancestors[i]));
+	}
+
+	for_each_process(process) {
+		struct task_struct *real_parent =
+			rcu_dereference(process->real_parent);
+
+		if (process == task->group_leader || !real_parent ||
+		    real_parent->tgid != task->tgid)
+			continue;
+		if (shown_children >= TI_MAX_CHILDREN)
+			break;
+
+		get_task_comm(parent_command, process);
+		EMIT("child: pid = [%d] command = [%s] state = [%u]\n",
+		     task_tgid_vnr(process), parent_command,
+		     ti_state(process));
+		shown_children++;
+	}
+	if (shown_children < child_count)
+		EMIT("truncated = [children]\n");
 
 	rcu_read_unlock();
 	return len;
