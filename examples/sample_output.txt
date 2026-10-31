@@ -12,3 +12,7 @@ child: pid = [1401] command = [sleep] state = [1]
 
 # nonexistent pid -> read returns 0 bytes (textbook), dmesg: "task_info: no task with pid 4194303"
 # bad write -> "echo abc > /proc/pid" : write error (Invalid argument), dmesg warning
+
+# Observed manually on Ubuntu VM (2026-10-28, kernel 7.0.0-31-generic):
+# With two sleep children, the report showed nchildren = [3] because cat was
+# also a child at the instant it read /proc/pid. See tests/test_cases.md.
