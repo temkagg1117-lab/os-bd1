@@ -47,11 +47,9 @@ MOCK горимын үр дүн: **18/18 OK** (багийн хөгжүүлэлт
 - On 2026-10-28, the Ubuntu VM reported kernel `7.0.0-31-generic`; a manual
   module build/load and `/proc/pid` read succeeded. Two `sleep` children were
   listed. `nchildren = 3` included the `cat` process used to read the report.
-- This manual result predates the current integrated branch; the final module
-  test script has not been run on the current branch.
-- The current `main` tree is missing `src/ti_main.c`, which the Makefile needs.
-  The module test runner now reports this prerequisite explicitly. Run it after
-  the M1 module source is merged into the integration branch.
+- This manual result predates the current integrated branch. M1's
+  `src/ti_main.c` is now present on `main`; the updated M5 test runner's
+  prerequisite and safety checks still need a run against the final branch.
 - The API mock test run during M5 development passed 20/20 against the M3
   backend branch. The current integrated mock backend reads Linux `/proc`, so
   run its API suite on Linux; a macOS run cannot validate that procfs behavior.
