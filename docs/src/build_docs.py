@@ -19,8 +19,8 @@ pdfmetrics.registerFont(TTFont("M", FD + "DejaVuSansMono.ttf"))
 pdfmetrics.registerFontFamily("S", normal="S", bold="SB", italic="S", boldItalic="SB")
 
 CODE = "<II|IV|V>-<цаг>-2"
-TEAM = ["Гишүүн 1 — ________ (B________)", "Гишүүн 2 — ________ (B________)", "Гишүүн 3 — ________ (B________)",
-        "Гишүүн 4 — ________ (B________)", "Гишүүн 5 — ________ (B________)"]
+TEAM = ["1. Тэмүүжин (B242270046)", "2. Цогтбаяр (B242270133)", "3. Бямбасүрэн (B241940082)",
+        "4. Гантулга (B190910023)", "5. Гантүшиг (B231940130)", "6. Ганболд (B241910023)"]
 REPO = "https://github.com/temkagg1117-lab/os-bd1"
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.dirname(HERE)
@@ -58,15 +58,35 @@ def build(path, title, story):
 
 # ================================================================= REPORT ==
 RESULTS = [  # (ID, оролт, хүлээгдсэн, БОДИТ үр дүн) - VM дээр ажиллуулсны дараа "Бодит" баганыг бөглөнө
-    ("T1", "echo $$ > /proc/pid; cat /proc/pid", "command = [bash] pid = [N] state = [n]", "________"),
-    ("T2", "pid 1", "pid = [1], ancestor байхгүй", "________"),
-    ("T3", "ppid шалгалт", "/proc/$$/stat-ийн ppid-тэй тэнцүү", "________"),
-    ("T4", "2 sleep & үүсгэх", "2 child: мөр", "________"),
-    ("T5", "kill -STOP sleep", "state = [4]", "________"),
-    ("T6", "echo 4194303 > /proc/pid", "read = 0 byte", "________"),
-    ("E1-E4", "abc, 0, -5, 99999999999, хоосон, 12abc", "write амжилтгүй (EINVAL), pid өөрчлөгдөхгүй", "________"),
-    ("R1", "rmmod / insmod", "/proc/pid устаж, дахин үүснэ", "________"),
-    ("K1", "dmesg", "oops/BUG/RCU warning байхгүй", "________"),
+    ("T1", "echo $$ > /proc/pid; cat /proc/pid", "command = [bash] pid = [N] state = [n]", "Давсан: command =[bash] pid = [5554]
+state = [1]"),
+    ("T2", "pid 1", "pid = [1], ancestor байхгүй", "Давсан
+(run_module_tests.sh
+T2)"),
+    ("T3", "ppid шалгалт", "/proc/$$/stat-ийн ppid-тэй тэнцүү", "Давсан: ppid = [5543]"),
+    ("T4", "2 sleep & үүсгэх", "2 child: мөр", "Давсан: хоёр child:
+мөр жагсаагдсан"),
+    ("T5", "kill -STOP sleep", "state = [4]", "state = [260], 260 =
+TASK_WAKEKILL (256) +
+__TASK_STOPPED (4), bit
+4 тавигдсан. Эхний тест
+яг [4] хүлээсэн тул унасан, bit-ээр шалгахаар
+засав"),
+    ("T6", "echo 4194303 > /proc/pid", "read = 0 byte", "Давсан: 0 байт, dmesg:
+no task with pid
+4194303"),
+    ("E1-E4", "abc, 0, -5, 99999999999, хоосон, 12abc", "write амжилтгүй (EINVAL), pid өөрчлөгдөхгүй", "Давсан: бүгд Invalid
+argument, өмнөх pid
+хэвээр. Хоосон оролт:
+bash 0 байт бичихэд
+write() хийдэггүй тул
+module хүртэл ирээгүй
+(тестийн алдаа), зайгаар () дахин шалгана"),
+    ("R1", "rmmod / insmod", "/proc/pid устаж, дахин үүснэ", "Давсан: rmmod-ийн дараа файл алга, insmod
+дахин ажилласан"),
+    ("K1", "dmesg", "oops/BUG/RCU warning байхгүй", "Давсан: dmesg-д зөвхөн
+task_info мэдээлэл,
+oops байхгүй"),
 ]
 
 
@@ -74,7 +94,7 @@ def report():
     s = []
     s += [Spacer(1, 40 * mm), P("F.CSM302 ҮЙЛДЛИЙН СИСТЕМ", C), P("БИЕ ДААЛТ 1 — СУДАЛГАА, ХЭРЭГЖИЛТ, ТУРШИЛТЫН ТАЙЛАН", C), Spacer(1, 12 * mm),
           P("Linux Kernel Module for Task Information", T), P("Сурах бичиг: Silberschatz, Operating System Concepts (10th ed.), Chapter 3 Processes — Programming Project 2", C),
-          Spacer(1, 8 * mm), P(f"Хуваарилалтын код: <b>{CODE}</b>", C), P("UI дүрслэл: Task hierarchy", C), Spacer(1, 8 * mm)]
+          Spacer(1, 8 * mm), P(f"Хуваарилалтын код: <b>{II-4-2}</b>", C), P("UI дүрслэл: Task hierarchy", C), Spacer(1, 8 * mm)]
     s += [P(m, C) for m in TEAM] + [Spacer(1, 6 * mm), P(f"GitHub: {REPO}", C), PageBreak()]
 
     s += [P("Хураангуй", H1),
@@ -151,8 +171,8 @@ for_each_process(p)
             "<font name='M'>/api/spawn</font> (туршилтын sleep мод), <font name='M'>/api/cleanup</font>. Алдаа: BAD_PID(400), NO_SUCH_PID(404), "
             "MODULE_NOT_LOADED(503), PERMISSION(403). <font name='M'>--mock</font> горим нь module-гүй машин дээр UI үзэх зориулалттай бөгөөд UI дээр шар тэмдэглэгээтэй."),
           P("<b>5.4 GitHub ажиллагаа.</b> (багийнхан бөглөнө)"),
-          table([("Гишүүн", "Салбар", "Commit тоо", "PR / Review", "Issue"), ("1", "m1-proc-interface", "__", "__", "__"), ("2", "m2-walker", "__", "__", "__"),
-                 ("3", "m3-backend", "__", "__", "__"), ("4", "m4-ui", "__", "__", "__"), ("5", "m5-tests-docs", "__", "__", "__")], [22, 45, 28, 40, 35])]
+          table([("Гишүүн", "Салбар", "Commit тоо", "PR / Review", "Issue"), ("Тэмүүжин", "m1-proc-interface", "8", "3", "1"), ("Цогтбаяр", "m2-walker", "4, "3, "0"),
+                 ("Бямбасүрэн", "m3-backend", "1", "0", "0"), ("Гантулга", "m4-ui", "1", "0", "0"), ("Гантүшиг", "m5-tests", "1", "1", "0"), ("Ганболд", "m6-docs", "1", "0", "0")], [22, 45, 28, 40, 35])]
     s += [P("6. Туршилт ба UI дүрслэл", H1),
           P("UI дээр өөрчилж турших зүйлс ба ажиглах зүйл:"),
           table([("Өөрчлөх", "Ажиглах"),
@@ -165,7 +185,7 @@ for_each_process(p)
                  ("Reset", "Бүх оролт, зураг цэвэрлэгдэнэ")], [60, 110]),
           P("Өнгө: ногоон=RUNNING(0), цэнхэр=INTERRUPTIBLE(1), улбар шар=UNINTERRUPTIBLE(2), саарал=STOPPED/TRACED(4,8), улаан=ZOMBIE/DEAD.")]
     s += [P("7. Туршилтын арга", H1),
-          P("<b>Орчин.</b> Ubuntu 22.04/24.04 VM (kernel: ______), gcc, make, linux-headers, Python 3. "
+          P("<b>Орчин.</b> Ubuntu 22.04/24.04 VM (kernel: 6.12.113+deb13-amd64), gcc, make, linux-headers, Python 3. "
             "<b>Өгөгдөл.</b> Хатуу кодлосон ганц өгөгдөл байхгүй: $$, pid 1, sleep процессууд, <font name='M'>/api/spawn</font>-аар үүссэн мод, тогтмол буруу утгууд. "
             "<b>Автомат.</b> <font name='M'>sudo ./tests/run_module_tests.sh</font> (бодит module), <font name='M'>python3 tests/test_ui_api.py [--module]</font> (backend). "
             "<b>Давтах.</b> Үр дүн бүрийг Manual-д заасан тушаалаар давтан шалгаж болно. Дэлгэрэнгүй: <font name='M'>tests/test_cases.md</font>.")]
@@ -176,8 +196,6 @@ for_each_process(p)
           P("<b>8.2 Бодит kernel module (VM).</b> Доорх хүснэгтийн “Бодит” баганыг <font name='M'>sudo ./tests/run_module_tests.sh</font>-ийн гаралтаар бөглөнө:"),
           table([("ID", "Оролт", "Хүлээгдсэн", "Бодит")] + [tuple(r) for r in RESULTS], [14, 52, 70, 34]),
           Spacer(1, 3 * mm),
-          P("<b>8.3 Screenshot.</b> (1) <font name='M'>cat /proc/pid</font> гаралт; (2) UI дээрх мод (pid 1, depth 2); (3) “Mод үүсгэх”-ийн дараах мод ба "
-            "<font name='M'>ps -ef --forest</font> зэрэгцүүлсэн; (4) алдааны мэдээлэл; (5) dmesg. — <i>[багийнхан бодит screenshot-оо энд оруулна]</i>")]
     s += [P("9. Хэлэлцүүлэг", H1)] + bullets([
         "Номын загвар ганц глобал pid хадгалдаг тул зэрэг ажиллах хэрэглэгчид pid-г дарж болно; backend write+read-ийг lock-оор хамгаалсан боловч module түвшинд per-open төлөв хэрэгжүүлбэл илүү зөв.",
         "Children-ийг for_each_process-оор олох нь O(N) (N = нийт процесс); мод бүрийн node бүрт дахин асуулт өгдөг тул том системд node-ийн дээд хязгаар шаардлагатай.",
@@ -244,7 +262,7 @@ python3 ui/server.py            # дараа нь browser: http://127.0.0.1:8000
                  ("<font name='M'>insmod</font>: Invalid module format / Key rejected", "Headers нь ажиллаж буй kernel-тэй таарахгүй / Secure Boot — headers-ийг шинэчил, Secure Boot-ыг VM-д унтраа")], [58, 112])]
     s += [PageBreak(), P("8.2 Operational заавар", H1),
           P("<b>Repository clone.</b> <font name='M'>git clone https://github.com/temkagg1117-lab/os-bd1.git</font> (Release/Tag: <font name='M'>v1.0</font>)."),
-          P("<b>OS, compiler/runtime, version.</b> Ubuntu 22.04/24.04 (kernel 5.15 / 6.8 — багийн орчин: ______), gcc ≥ 11, GNU make, Python ≥ 3.8, linux-headers-$(uname -r)."),
+          P("<b>OS, compiler/runtime, version.</b> Ubuntu 22.04/24.04 (kernel 5.15 / 6.8 — багийн орчин: 6.12.113+deb13-amd64), gcc ≥ 11, GNU make, Python ≥ 3.8, linux-headers-$(uname -r)."),
           P("<b>Dependency.</b> <font name='M'>sudo apt install build-essential linux-headers-$(uname -r) python3</font>. Python-д гадаад сан хэрэггүй."),
           P("<b>Build ба Run команд.</b>"),
           code("""make -C src                          # src/task_info.ko
