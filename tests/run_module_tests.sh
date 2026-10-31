@@ -9,8 +9,15 @@ ok()   { echo "PASS  $1"; PASS=$((PASS+1)); }
 bad()  { echo "FAIL  $1  ($2)"; FAIL=$((FAIL+1)); }
 
 [ "$(id -u)" -eq 0 ] || { echo "run with sudo"; exit 2; }
+if [ ! -f src/ti_main.c ]; then
+  echo "ERROR: src/ti_main.c is missing; merge the M1 module implementation first."
+  exit 2
+fi
+if [ -e /proc/pid ]; then
+  echo "ERROR: /proc/pid already exists; unload task_info manually before testing."
+  exit 2
+fi
 make -C src >/dev/null || { echo "build failed"; exit 2; }
-rmmod task_info 2>/dev/null
 insmod src/task_info.ko || { echo "insmod failed (dmesg | tail)"; exit 2; }
 trap 'rmmod task_info 2>/dev/null' EXIT
 

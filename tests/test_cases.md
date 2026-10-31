@@ -41,3 +41,15 @@ MOCK горимын үр дүн: **18/18 OK** (багийн хөгжүүлэлт
 | U-6 | `rmmod` хийгээд Харуулах | "module ачаалагдаагүй" мэдээлэл |
 | U-7 | Автомат шинэчлэл + `kill` хийх | Мод 2 сек дотор шинэчлэгдэнэ |
 | U-8 | Reset | Бүх талбар, зураг цэвэрлэгдэнэ |
+
+## M5 validation notes
+
+- On 2026-10-28, the Ubuntu VM reported kernel `7.0.0-31-generic`; a manual
+  module build/load and `/proc/pid` read succeeded. Two `sleep` children were
+  listed. `nchildren = 3` included the `cat` process used to read the report.
+- This manual result predates the current integrated branch. M1's
+  `src/ti_main.c` is now present on `main`; the updated M5 test runner's
+  prerequisite and safety checks still need a run against the final branch.
+- The API mock test run during M5 development passed 20/20 against the M3
+  backend branch. The current integrated mock backend reads Linux `/proc`, so
+  run its API suite on Linux; a macOS run cannot validate that procfs behavior.
