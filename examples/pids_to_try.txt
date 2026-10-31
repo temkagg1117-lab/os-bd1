@@ -1,0 +1,6 @@
+# PID                  expected
+1                      systemd/init, no ancestors
+$$ (your shell)        bash/zsh with ancestors up to init
+2                      kthreadd, children = kernel threads
+4194303                empty read (no such task)
+abc / 0 / -5 / 1e3     write rejected (EINVAL)

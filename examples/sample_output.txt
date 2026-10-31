@@ -1,0 +1,14 @@
+# FORMAT EXAMPLE (illustrative; regenerate on your VM with: echo $$ > /proc/pid; cat /proc/pid)
+$ echo "1395" > /proc/pid
+$ cat /proc/pid
+command = [bash] pid = [1395] state = [1]
+state_name = [TASK_INTERRUPTIBLE]
+ppid = [1200] parent_command = [sshd]
+nchildren = [2]
+ancestor: pid = [1] command = [systemd] state = [1]
+ancestor: pid = [1200] command = [sshd] state = [1]
+child: pid = [1400] command = [sleep] state = [1]
+child: pid = [1401] command = [sleep] state = [1]
+
+# nonexistent pid -> read returns 0 bytes (textbook), dmesg: "task_info: no task with pid 4194303"
+# bad write -> "echo abc > /proc/pid" : write error (Invalid argument), dmesg warning
