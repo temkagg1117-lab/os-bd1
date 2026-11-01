@@ -1,6 +1,6 @@
 # F.CSM302 Бие даалт 1 — Linux Kernel Module for Task Information
 
-**Хуваарилалтын код:** `<II|IV|V>-<цаг>-2` (сэдэв 2) — *багийн кодоо энд бөглөнө*
+**Хуваарилалтын код:** `<II>-<4>-2` (сэдэв 2) — *багийн кодоо энд бөглөнө*
 **Сурах бичиг:** Silberschatz, *Operating System Concepts* (10th ed.), Chapter 3 Processes, Programming Project 2
 **UI дүрслэл:** Task hierarchy (parent–child мод)
 
