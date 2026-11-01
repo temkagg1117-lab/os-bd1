@@ -18,7 +18,7 @@ pdfmetrics.registerFont(TTFont("SB", FD + "DejaVuSans-Bold.ttf"))
 pdfmetrics.registerFont(TTFont("M", FD + "DejaVuSansMono.ttf"))
 pdfmetrics.registerFontFamily("S", normal="S", bold="SB", italic="S", boldItalic="SB")
 
-CODE = "<II|IV|V>-<цаг>-2"
+CODE = "<II>-<4>-2"
 TEAM = ["1. Тэмүүжин (B242270046)", "2. Цогтбаяр (B242270133)", "3. Бямбасүрэн (B241940082)",
         "4. Гантулга (B190910023)", "5. Гантүшиг (B231940130)", "6. Ганболд (B241910023)"]
 REPO = "https://github.com/temkagg1117-lab/os-bd1"
