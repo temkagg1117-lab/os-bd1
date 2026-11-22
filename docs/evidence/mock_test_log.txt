@@ -1,0 +1,26 @@
+test_demo_group_cap (test_bd2_api.LiveApiTests.test_demo_group_cap) ... ok
+test_depth_zero_has_no_descendants (test_bd2_api.LiveApiTests.test_depth_zero_has_no_descendants) ... ok
+test_http_method_validation (test_bd2_api.LiveApiTests.test_http_method_validation) ... ok
+test_index_served (test_bd2_api.LiveApiTests.test_index_served) ... ok
+test_info_mode (test_bd2_api.LiveApiTests.test_info_mode) ... ok
+test_invalid_depth_or_max_fails_not_clamped (test_bd2_api.LiveApiTests.test_invalid_depth_or_max_fails_not_clamped) ... ok
+test_missing_and_invalid_pid (test_bd2_api.LiveApiTests.test_missing_and_invalid_pid) ... ok
+test_pid1_textbook_format (test_bd2_api.LiveApiTests.test_pid1_textbook_format) ... ok
+test_query_self_matches_real_proc (test_bd2_api.LiveApiTests.test_query_self_matches_real_proc) ... ok
+test_spawn_and_cleanup (test_bd2_api.LiveApiTests.test_spawn_and_cleanup) ... ok
+test_spawn_fanout_validation (test_bd2_api.LiveApiTests.test_spawn_fanout_validation) ... ok
+test_static_symlink_escape_blocked (test_bd2_api.LiveApiTests.test_static_symlink_escape_blocked) ... ok
+test_static_traversal (test_bd2_api.LiveApiTests.test_static_traversal) ... ok
+test_check_pid_rejects_signed_whitespace_and_invalid (test_bd2_api.ProtocolTests.test_check_pid_rejects_signed_whitespace_and_invalid) ... ok
+test_parse_preserves_command_containing_closing_bracket (test_bd2_api.ProtocolTests.test_parse_preserves_command_containing_closing_bracket) ... ok
+test_parse_rejects_impossible_child_count (test_bd2_api.ProtocolTests.test_parse_rejects_impossible_child_count) ... ok
+test_parse_rejects_malformed_report (test_bd2_api.ProtocolTests.test_parse_rejects_malformed_report) ... ok
+test_parse_rejects_mismatched_pid (test_bd2_api.ProtocolTests.test_parse_rejects_mismatched_pid) ... ok
+test_parser_empty_report_is_404 (test_bd2_api.ProtocolTests.test_parser_empty_report_is_404) ... ok
+test_state_not_faked (test_bd2_api.ProtocolTests.test_state_not_faked) ... ok
+test_strict_integer_validation (test_bd2_api.ProtocolTests.test_strict_integer_validation) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 1.011s
+
+OK

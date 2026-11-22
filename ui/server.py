@@ -1,29 +1,43 @@
 #!/usr/bin/env python3
+"""Task Information /proc backend for F.CSM302 BD2.
+
+Real mode uses the Linux kernel module at /proc/pid. Mock mode reads actual
+Linux /proc/<pid>/stat (not synthetic test data) and is visibly labelled.
+Only Python standard-library packages are needed at runtime.
 """
-server.py - backend of the Task hierarchy UI (Member 3)
-
-Talks to the kernel module through /proc/pid exactly like the textbook:
-    write "<pid>"  ->  read report
-and serves the browser UI in ui/static/.
-
-Modes
-  real (default)  uses the kernel module entry   (--proc /proc/pid)
-  --mock          emulates the module's output from /proc/<pid>/stat so the
-                  UI can be tried on a machine WITHOUT the module loaded.
-                  The UI shows a visible MOCK banner in this mode.
-
-Only the Python standard library is used. Binds to 127.0.0.1 by default.
-"""
-import argparse, errno, json, os, re, signal, subprocess, sys, threading
+import argparse
+import errno
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
-PID_MAX = 4194304                      # PID_MAX_LIMIT on 64-bit Linux
-STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-FIELD = re.compile(r"(\w+)\s*=\s*\[(.*?)\]")
-LOCK = threading.Lock()                # the module keeps ONE global pid
-SPAWNED = []                           # demo process groups to clean up
+PID_MAX = 4194304
+STATIC = os.path.realpath(os.path.join(os.path.dirname(__file__), "static"))
+LOCK = threading.Lock()   # The kernel module keeps one globally selected PID
+SPAWN_LOCK = threading.Lock()
+SPAWNED = []
+MAX_SPAWN_GROUPS = 3
 CFG = {"proc": "/proc/pid", "mock": False}
+
+STATE_NAMES = {
+    "R": "TASK_RUNNING", "S": "TASK_INTERRUPTIBLE",
+    "D": "TASK_UNINTERRUPTIBLE", "T": "__TASK_STOPPED",
+    "t": "__TASK_TRACED", "Z": "EXIT_ZOMBIE",
+    "X": "EXIT_DEAD", "I": "TASK_INTERRUPTIBLE",
+}
+STATE_NUM = {"R": 0, "S": 1, "I": 1, "D": 2, "T": 4, "t": 8, "Z": 0, "X": 0}
+LINE_MAIN = re.compile(r"^command = \[(.*)\] pid = \[(\d+)\] state = \[(\d+)\]$")
+LINE_REL = re.compile(r"^(ancestor|child): pid = \[(\d+)\] command = \[(.*)\] state = \[(\d+)\]$")
+LINE_PARENT = re.compile(r"^ppid = \[(\d+)\] parent_command = \[(.*)\]$")
+LINE_STATE = re.compile(r"^state_name = \[(.+)\]$")
+LINE_CHILD_COUNT = re.compile(r"^nchildren = \[(\d+)\]$")
 
 
 class ApiError(Exception):
@@ -32,114 +46,129 @@ class ApiError(Exception):
         self.code, self.status, self.message = code, status, message
 
 
-# ---------------------------------------------------------------- mock ----
-STATE_NAMES = {"R": "TASK_RUNNING", "S": "TASK_INTERRUPTIBLE",
-               "D": "TASK_UNINTERRUPTIBLE", "T": "__TASK_STOPPED",
-               "t": "__TASK_TRACED", "Z": "EXIT_ZOMBIE", "X": "EXIT_DEAD",
-               "I": "TASK_INTERRUPTIBLE"}
-STATE_NUM = {"R": 0, "S": 1, "I": 1, "D": 2, "T": 4, "t": 8, "Z": 0, "X": 0}
-
-
 def _stat(pid):
-    """-> (comm, state_char, ppid) from /proc/<pid>/stat or None."""
+    """Read one real Linux process stat entry. PID can exit during this call."""
     try:
-        with open(f"/proc/{pid}/stat") as f:
-            s = f.read()
-    except OSError:
+        with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as f:
+            line = f.read()
+        left, right = line.index("("), line.rindex(")")
+        fields = line[right + 2:].split()
+        return line[left + 1:right], fields[0], int(fields[1])
+    except (OSError, ValueError, IndexError):
         return None
-    l, r = s.index("("), s.rindex(")")
-    rest = s[r + 2:].split()
-    return s[l + 1:r], rest[0], int(rest[1])
 
 
 def mock_report(pid):
+    """Generate the same protocol as the module using observed /proc data."""
     me = _stat(pid)
     if me is None:
         return ""
-    comm, st, ppid = me
-    out = [f"command = [{comm}] pid = [{pid}] state = [{STATE_NUM.get(st, 0)}]",
-           f"state_name = [{STATE_NAMES.get(st, 'OTHER')}]"]
-    par = _stat(ppid) if ppid > 0 else None
-    out.append(f"ppid = [{ppid if par else 0}] parent_command = [{par[0] if par else '-'}]")
+    comm, state, ppid = me
+    out = [
+        f"command = [{comm}] pid = [{pid}] state = [{STATE_NUM.get(state, 0)}]",
+        f"state_name = [{STATE_NAMES.get(state, 'OTHER')}]",
+    ]
+    parent = _stat(ppid) if ppid > 0 else None
+    out.append(f"ppid = [{ppid if parent else 0}] parent_command = [{parent[0] if parent else '-'}]")
     chain, cur = [], ppid
-    while par and len(chain) < 64:
-        chain.append((cur, par))
-        cur = par[2]
-        par = _stat(cur) if cur > 0 else None
-    kids = []
-    for d in os.listdir("/proc"):
-        if d.isdigit():
-            s = _stat(int(d))
-            if s and s[2] == pid and int(d) != pid:
-                kids.append((int(d), s))
-    out.append(f"nchildren = [{len(kids)}]")
-    for p, (c, s, _) in reversed(chain):
-        out.append(f"ancestor: pid = [{p}] command = [{c}] state = [{STATE_NUM.get(s, 0)}]")
-    for p, (c, s, _) in sorted(kids)[:128]:
-        out.append(f"child: pid = [{p}] command = [{c}] state = [{STATE_NUM.get(s, 0)}]")
-    if len(kids) > 128:
+    seen = {pid}
+    while parent is not None and len(chain) < 64 and cur not in seen:
+        seen.add(cur)
+        chain.append((cur, parent))
+        cur = parent[2]
+        parent = _stat(cur) if cur > 0 else None
+    children = []
+    try:
+        proc_entries = os.listdir("/proc")
+    except OSError:
+        proc_entries = []
+    for entry in proc_entries:
+        if entry.isdigit():
+            child_pid = int(entry)
+            child = _stat(child_pid)
+            if child and child[2] == pid and child_pid != pid:
+                children.append((child_pid, child))
+    out.append(f"nchildren = [{len(children)}]")
+    for ancestor_pid, (name, st, _) in reversed(chain):
+        out.append(f"ancestor: pid = [{ancestor_pid}] command = [{name}] state = [{STATE_NUM.get(st, 0)}]")
+    for child_pid, (name, st, _) in sorted(children)[:128]:
+        out.append(f"child: pid = [{child_pid}] command = [{name}] state = [{STATE_NUM.get(st, 0)}]")
+    if len(children) > 128:
         out.append("truncated = [children]")
     return "\n".join(out) + "\n"
 
 
-# ------------------------------------------------------------- module IO ----
 def read_module(pid):
-    """write pid, read report - the textbook protocol. Returns raw text."""
+    """Write the selected PID and read its report under the server's lock."""
     if CFG["mock"]:
         return mock_report(pid)
     path = CFG["proc"]
     try:
-        with LOCK:                      # keep write+read atomic for us
-            with open(path, "w") as f:
+        with LOCK:
+            with open(path, "w", encoding="ascii") as f:
                 f.write(str(pid))
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
                 return f.read()
     except FileNotFoundError:
         raise ApiError("MODULE_NOT_LOADED", 503,
-                       f"{path} олдсонгүй. Kernel module ачаалагдаагүй байна: "
-                       "`sudo insmod src/task_info.ko` (эсвэл --mock ашиглана уу).")
+                       f"{path} байхгүй. `sudo insmod src/task_info.ko` эсвэл --mock хэрэглэнэ үү.")
     except PermissionError:
-        raise ApiError("PERMISSION", 403, f"{path} руу бичих эрх алга (chmod/sudo шалгана уу).")
-    except OSError as e:
-        if e.errno == errno.EINVAL:
-            raise ApiError("BAD_PID", 400, "Module энэ утгыг хүлээн авсангүй (EINVAL).")
-        raise ApiError("IO", 500, f"/proc алдаа: {e.strerror}")
+        raise ApiError("PERMISSION", 403, f"{path} файлд хандах эрх алга.")
+    except OSError as ex:
+        if ex.errno == errno.EINVAL:
+            raise ApiError("BAD_PID", 400, "Kernel module PID-ийг хүлээн авсангүй (EINVAL).")
+        raise ApiError("IO", 500, "Kernel module-ээс уншихад алдаа гарлаа.")
 
 
 def parse(raw, pid):
-    """Parse the module report into a dict. Empty text = no such task."""
+    """Strictly validate the text protocol, preserving bracketed command names."""
     if not raw.strip():
-        raise ApiError("NO_SUCH_PID", 404,
-                       f"PID {pid} бүхий process олдсонгүй (module 0 byte буцаалаа).")
-    res = {"children": [], "ancestors": [], "truncated": False}
+        raise ApiError("NO_SUCH_PID", 404, f"PID {pid} бүхий процесс олдсонгүй.")
+    result = {"children": [], "ancestors": [], "truncated": False}
     for line in raw.splitlines():
-        f = dict(FIELD.findall(line))
-        if line.startswith("ancestor:"):
-            res["ancestors"].append({"pid": int(f["pid"]), "command": f["command"], "state": int(f["state"])})
-        elif line.startswith("child:"):
-            res["children"].append({"pid": int(f["pid"]), "command": f["command"], "state": int(f["state"])})
-        elif line.startswith("command"):
-            res.update(command=f["command"], pid=int(f["pid"]), state=int(f["state"]))
-        elif line.startswith("state_name"):
-            res["state_name"] = f["state_name"]
-        elif line.startswith("ppid"):
-            res.update(ppid=int(f["ppid"]), parent_command=f["parent_command"])
-        elif line.startswith("nchildren"):
-            res["nchildren"] = int(f["nchildren"])
-        elif line.startswith("truncated"):
-            res["truncated"] = True
-    if "pid" not in res:
-        raise ApiError("BAD_OUTPUT", 502, "Module-ийн гаралтыг задлаж чадсангүй.")
-    res["raw"] = raw
-    return res
+        m = LINE_MAIN.fullmatch(line)
+        if m:
+            result.update(command=m.group(1), pid=int(m.group(2)), state=int(m.group(3)))
+            continue
+        m = LINE_REL.fullmatch(line)
+        if m:
+            record = {"pid": int(m.group(2)), "command": m.group(3), "state": int(m.group(4))}
+            result["ancestors" if m.group(1) == "ancestor" else "children"].append(record)
+            continue
+        m = LINE_PARENT.fullmatch(line)
+        if m:
+            result.update(ppid=int(m.group(1)), parent_command=m.group(2))
+            continue
+        m = LINE_STATE.fullmatch(line)
+        if m:
+            result["state_name"] = m.group(1)
+            continue
+        m = LINE_CHILD_COUNT.fullmatch(line)
+        if m:
+            result["nchildren"] = int(m.group(1))
+            continue
+        if line == "truncated = [children]":
+            result["truncated"] = True
+            continue
+        # Recognized prefixes must not silently become partial/corrupt results.
+        if line.startswith(("command", "ancestor:", "child:", "ppid", "state_name", "nchildren", "truncated")):
+            raise ApiError("BAD_OUTPUT", 502, "Kernel module буруу форматтай мэдээлэл буцаалаа.")
+    required = {"pid", "command", "state", "ppid", "parent_command", "nchildren", "state_name"}
+    if not required.issubset(result) or result["pid"] != pid:
+        raise ApiError("BAD_OUTPUT", 502,
+                       "Module-ийн хариулт дутуу эсвэл өөр PID буцаасан (зэрэгцээ хандалт байж болно).")
+    if result["nchildren"] < len(result["children"]):
+        raise ApiError("BAD_OUTPUT", 502, "Module-ийн child тоо буруу байна.")
+    result["raw"] = raw
+    return result
 
 
 def check_pid(text):
-    try:
-        pid = int(str(text).strip())
-    except (TypeError, ValueError):
-        raise ApiError("BAD_PID", 400, f"'{text}' бүхэл тоо биш байна. PID нь 1-ээс {PID_MAX} хүртэлх бүхэл тоо.")
-    if pid < 1 or pid > PID_MAX:
+    text = str(text).strip() if text is not None else ""
+    if not re.fullmatch(r"[0-9]+", text):
+        raise ApiError("BAD_PID", 400, f"'{text}' зөв бүхэл PID биш. 1..{PID_MAX} байх ёстой.")
+    pid = int(text)
+    if not 1 <= pid <= PID_MAX:
         raise ApiError("BAD_PID", 400, f"PID {pid} хүрээнээс гадуур (1..{PID_MAX}).")
     return pid
 
@@ -149,126 +178,179 @@ def query(pid):
 
 
 def build_tree(pid, depth, max_nodes):
-    """Selected process + ancestors above it + descendants below (depth)."""
+    """Requested node + all ancestors + descendants within depth / node cap."""
     top = query(pid)
-    count = [1]
-    queries = [1]
+    count, queries = [1], [1]
+    had_cut = [bool(top["truncated"])]
+    visited = {pid}
 
-    def node(info, d):
+    def build(info, current_depth):
+        source_cut = info["truncated"] or info["nchildren"] > len(info["children"])
         n = {"pid": info["pid"], "command": info["command"], "state": info["state"],
-             "nchildren": info.get("nchildren", len(info["children"])), "children": []}
-        if d >= depth:
+             "nchildren": info["nchildren"], "children": [], "source_truncated": bool(source_cut),
+             "zombie": info.get("state_name", "").startswith("EXIT_")}
+        if source_cut:
+            had_cut[0] = True
+        if current_depth >= depth:
             return n
-        for c in info["children"]:
+        for child in info["children"]:
+            if child["pid"] in visited:
+                n["cut"] = True
+                had_cut[0] = True
+                continue
             if count[0] >= max_nodes:
                 n["cut"] = True
+                had_cut[0] = True
                 break
             count[0] += 1
+            visited.add(child["pid"])
             try:
                 queries[0] += 1
-                sub = query(c["pid"])
-                n["children"].append(node(sub, d + 1))
-            except ApiError:           # child exited between the two reads
-                n["children"].append({"pid": c["pid"], "command": c["command"],
-                                      "state": c["state"], "nchildren": 0, "children": [], "gone": True})
+                detail = query(child["pid"])
+                n["children"].append(build(detail, current_depth + 1))
+            except ApiError as ex:
+                if ex.code != "NO_SUCH_PID":
+                    raise
+                n["children"].append({"pid": child["pid"], "command": child["command"],
+                                      "state": child["state"], "nchildren": 0,
+                                      "children": [], "gone": True})
         return n
 
-    root = node(top, 0)
-    return {"selected": pid, "ancestors": top["ancestors"], "tree": root,
-            "nodes": count[0], "queries": queries[0], "truncated": count[0] >= max_nodes,
-            "state_name": top.get("state_name"), "ppid": top["ppid"],
+    return {"selected": pid, "ancestors": top["ancestors"], "tree": build(top, 0),
+            "nodes": count[0], "queries": queries[0], "truncated": had_cut[0],
+            "state_name": top["state_name"], "ppid": top["ppid"],
             "parent_command": top["parent_command"], "raw": top["raw"]}
 
 
-# ------------------------------------------------------------ demo spawn ----
-def gen_cmd(depth, fan):
+def gen_cmd(depth, fanout):
     if depth == 0:
         return "sleep 600"
-    return "(" + " & ".join([gen_cmd(depth - 1, fan)] * fan) + " & wait)"
+    return "(" + " & ".join([gen_cmd(depth - 1, fanout)] * fanout) + " & wait)"
 
 
-def spawn(depth, fan):
-    if not (1 <= depth <= 3 and 1 <= fan <= 4):
+def spawn(depth, fanout):
+    if not (1 <= depth <= 3 and 1 <= fanout <= 4):
         raise ApiError("BAD_PARAM", 400, "depth 1..3, fanout 1..4 байх ёстой.")
-    p = subprocess.Popen(["sh", "-c", gen_cmd(depth, fan) + " & wait"],
-                         start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    SPAWNED.append(p)
-    return p.pid
+    with SPAWN_LOCK:
+        SPAWNED[:] = [p for p in SPAWNED if p.poll() is None]
+        if len(SPAWNED) >= MAX_SPAWN_GROUPS:
+            raise ApiError("DEMO_LIMIT", 429,
+                           "3 туршилтын мод ажиллаж байна. 'Цэвэрлэх' дараад дахин оролдоно уу.")
+        p = subprocess.Popen(["sh", "-c", gen_cmd(depth, fanout) + " & wait"],
+                             start_new_session=True, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, close_fds=True)
+        SPAWNED.append(p)
+        return p.pid
 
 
 def kill_spawned():
-    n = 0
-    for p in SPAWNED:
+    with SPAWN_LOCK:
+        processes = list(SPAWNED)
+        SPAWNED.clear()
+    count = 0
+    for p in processes:
         try:
             os.killpg(p.pid, signal.SIGTERM)
-            n += 1
-        except OSError:
+            count += 1
+        except ProcessLookupError:
+            pass
+        except PermissionError:
             pass
         try:
             p.wait(timeout=2)
-        except Exception:
-            pass
-    SPAWNED.clear()
-    return n
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+    return count
 
 
-# ----------------------------------------------------------------- HTTP ----
+def positive_int(value, name, minimum, maximum):
+    if not re.fullmatch(r"[0-9]+", str(value)):
+        raise ApiError("BAD_PARAM", 400, f"{name} нь {minimum}..{maximum} бүхэл тоо байна.")
+    number = int(value)
+    if not minimum <= number <= maximum:
+        raise ApiError("BAD_PARAM", 400, f"{name} нь {minimum}..{maximum} байх ёстой.")
+    return number
+
+
 class H(BaseHTTPRequestHandler):
-    def log_message(self, *a):
-        pass
+    def log_message(self, fmt, *args):
+        sys.stderr.write("[backend] " + (fmt % args) + "\n")
 
     def _json(self, status, obj):
-        b = json.dumps(obj).encode()
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(b)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(b)
+        self.wfile.write(body)
 
     def _route(self, method):
-        u = urlparse(self.path)
-        q = {k: v[0] for k, v in parse_qs(u.query).items()}
-        if u.path == "/api/info":
+        url = urlparse(self.path)
+        params = {k: values[0] for k, values in parse_qs(url.query, keep_blank_values=True).items()}
+        if url.path in ("/api/info", "/api/query", "/api/tree") and method != "GET":
+            raise ApiError("METHOD_NOT_ALLOWED", 405, "Энд зөвхөн GET хүсэлт зөвшөөрнө.")
+        if url.path in ("/api/spawn", "/api/cleanup") and method != "POST":
+            raise ApiError("METHOD_NOT_ALLOWED", 405, "Энд зөвхөн POST хүсэлт зөвшөөрнө.")
+        if url.path == "/api/info":
             return {"mode": "mock" if CFG["mock"] else "module", "proc": CFG["proc"], "self_pid": os.getpid()}
-        if u.path == "/api/query":
-            return query(check_pid(q.get("pid")))
-        if u.path == "/api/tree":
-            depth = int(q.get("depth", 2)) if str(q.get("depth", 2)).isdigit() else None
-            if depth is None or not 0 <= depth <= 6:
-                raise ApiError("BAD_PARAM", 400, "depth 0..6 байх ёстой.")
-            mx = int(q.get("max", 200)) if str(q.get("max", 200)).isdigit() else 200
-            return build_tree(check_pid(q.get("pid")), depth, min(max(mx, 1), 500))
-        if u.path == "/api/spawn" and method == "POST":
-            d, f = q.get("depth", "2"), q.get("fanout", "2")
-            if not (d.isdigit() and f.isdigit()):
-                raise ApiError("BAD_PARAM", 400, "depth, fanout бүхэл тоо байх ёстой.")
-            return {"pid": spawn(int(d), int(f))}
-        if u.path == "/api/cleanup" and method == "POST":
+        if url.path == "/api/query":
+            return query(check_pid(params.get("pid")))
+        if url.path == "/api/tree":
+            pid = check_pid(params.get("pid"))
+            depth = positive_int(params.get("depth", "2"), "depth", 0, 6)
+            limit = positive_int(params.get("max", "200"), "max", 1, 500)
+            return build_tree(pid, depth, limit)
+        if url.path == "/api/spawn":
+            depth = positive_int(params.get("depth", "2"), "depth", 1, 3)
+            fanout = positive_int(params.get("fanout", "2"), "fanout", 1, 4)
+            return {"pid": spawn(depth, fanout)}
+        if url.path == "/api/cleanup":
             return {"killed_groups": kill_spawned()}
         return None
 
     def _handle(self, method):
         try:
-            r = self._route(method)
-            if r is not None:
-                return self._json(200, r)
+            if len(self.path) > 2048:
+                raise ApiError("URI_TOO_LONG", 414, "Хүсэлтийн урт хэтэрсэн.")
+            result = self._route(method)
+            if result is not None:
+                return self._json(200, result)
+            if method != "GET":
+                raise ApiError("METHOD_NOT_ALLOWED", 405, "Статик файлд GET ашиглана.")
             path = urlparse(self.path).path
-            path = "/index.html" if path in ("/", "") else path
-            fp = os.path.normpath(os.path.join(STATIC, path.lstrip("/")))
-            if not fp.startswith(STATIC) or not os.path.isfile(fp):
-                return self._json(404, {"error": "NOT_FOUND", "message": "Олдсонгүй"})
-            with open(fp, "rb") as f:
-                b = f.read()
+            if path in ("", "/"):
+                path = "/index.html"
+            file_path = os.path.realpath(os.path.join(STATIC, path.lstrip("/")))
+            if os.path.commonpath((STATIC, file_path)) != STATIC or not os.path.isfile(file_path):
+                raise ApiError("NOT_FOUND", 404, "Хуудас олдсонгүй.")
+            with open(file_path, "rb") as f:
+                body = f.read()
             self.send_response(200)
-            ct = {"html": "text/html", "js": "text/javascript", "css": "text/css"}.get(fp.rsplit(".", 1)[-1], "application/octet-stream")
-            self.send_header("Content-Type", ct + "; charset=utf-8")
-            self.send_header("Content-Length", str(len(b)))
+            kind = {"html": "text/html", "js": "text/javascript", "css": "text/css",
+                    "svg": "image/svg+xml", "png": "image/png"}.get(file_path.rsplit(".", 1)[-1],
+                                                              "application/octet-stream")
+            self.send_header("Content-Type", kind + ("; charset=utf-8" if kind.startswith("text/") else ""))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(b)
-        except ApiError as e:
-            self._json(e.status, {"error": e.code, "message": e.message})
-        except Exception as e:             # never leak a traceback to the UI
-            self._json(500, {"error": "INTERNAL", "message": f"Дотоод алдаа: {e}"})
+            self.wfile.write(body)
+        except ApiError as ex:
+            self._json(ex.status, {"error": ex.code, "message": ex.message})
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception:
+            traceback.print_exc()
+            self._json(500, {"error": "INTERNAL", "message": "Дотоод алдаа. Server log-ийг шалгана уу."})
 
     def do_GET(self):
         self._handle("GET")
@@ -278,20 +360,22 @@ class H(BaseHTTPRequestHandler):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--proc", default="/proc/pid", help="module /proc entry (default /proc/pid)")
-    ap.add_argument("--mock", action="store_true", help="emulate the module (no kernel module needed)")
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--proc", default="/proc/pid")
+    ap.add_argument("--mock", action="store_true")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8000)
-    a = ap.parse_args()
-    CFG.update(proc=a.proc, mock=a.mock)
-    srv = ThreadingHTTPServer((a.host, a.port), H)
-    print(f"Task hierarchy UI: http://{a.host}:{a.port}/   mode={'MOCK' if a.mock else 'module ' + a.proc}")
+    opts = ap.parse_args()
+    CFG.update(proc=opts.proc, mock=opts.mock)
+    srv = ThreadingHTTPServer((opts.host, opts.port), H)
+    srv.daemon_threads = True
+    print(f"Task hierarchy UI: http://{opts.host}:{opts.port}/   mode={'MOCK' if opts.mock else 'module'}", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        srv.server_close()
         kill_spawned()
 
 
