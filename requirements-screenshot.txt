@@ -1,0 +1,2 @@
+# Optional: NOT needed to run ui/server.py or to view the PDFs
+playwright==1.57.0

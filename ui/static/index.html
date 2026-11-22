@@ -1,144 +1,95 @@
 <!DOCTYPE html>
 <html lang="mn">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Task Hierarchy - Linux Kernel Module for Task Information</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--fg:#1d2430;--mut:#667085;--line:#cfd6e0;--acc:#2f6fed;
---run:#2e9e5b;--slp:#3b82c4;--dsk:#e08a1e;--stp:#8a8f98;--zmb:#d64545}
-@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d222a;--fg:#e8ebf0;--mut:#9aa4b2;--line:#39424f}}
-*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
-header{padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-h1{font-size:16px;margin:0}
-#mode{padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
-.mod{background:#d9f2e3;color:#14532d}.mck{background:#fde68a;color:#78350f}
-main{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:12px}
-@media(max-width:800px){main{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
-.card h2{font-size:13px;margin:0 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
-label{display:block;margin:6px 0 2px;font-size:12px;color:var(--mut)}
-input,select,button{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
-input{width:100%}button{cursor:pointer;background:var(--acc);color:#fff;border:0;margin:6px 6px 0 0}
-button.sec{background:var(--bg);color:var(--fg);border:1px solid var(--line)}
-#err{display:none;background:#fde8e8;color:#7f1d1d;border:1px solid #f5b5b5;padding:8px;border-radius:6px;margin-bottom:10px}
-#view{overflow:auto;height:560px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
-.n rect{stroke-width:2;rx:7;cursor:pointer}.n text{pointer-events:none;font-size:12px;fill:#fff}
-.n.sel rect{stroke:#111;stroke-width:3}.n.gone rect{opacity:.35}
-.edge{fill:none;stroke:var(--mut);stroke-width:1.4}
-.legend span{display:inline-block;margin:2px 10px 2px 0;font-size:12px}
-.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
-dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}dt{color:var(--mut)}dd{margin:0;word-break:break-all}
-pre{margin:0;font:12px/1.35 ui-monospace,monospace;white-space:pre-wrap;max-height:200px;overflow:auto}
-.hint{font-size:12px;color:var(--mut)}
+:root{--bg:#0b1424;--surface:#152338;--panel:#1b2b43;--line:#30445e;--ink:#f1f6ff;--muted:#a3b5cc;--blue:#5a9cff;--green:#39b98d;--amber:#ffb552;--red:#ff7783}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,-apple-system,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 28px;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+header h1{font-size:23px;letter-spacing:-.035em;line-height:1.15;margin:0}header .subtitle{font-size:12px;color:var(--muted);margin-top:5px}
+#mode{border-radius:999px;background:#124532;color:#a6f3d2;padding:6px 12px;font-weight:750;white-space:nowrap}
+#mode.mock{background:#60421c;color:#ffe4ab}
+main{display:grid;grid-template-columns:minmax(278px,320px) minmax(0,1fr);gap:16px;padding:18px;max-width:1680px;margin:0 auto}
+@media(max-width:850px){main{grid-template-columns:1fr}header{padding:16px}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:17px;margin-bottom:16px;box-shadow:0 7px 22px #030b1933}
+.card h2{font-size:13px;letter-spacing:.075em;text-transform:uppercase;color:#b9d4f5;margin:0 0 14px}
+label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
+input,button{font:inherit;border-radius:8px;padding:10px 12px}input{background:var(--panel);border:1px solid #425671;width:100%;color:var(--ink);outline-offset:2px}
+input:focus{outline:2px solid var(--blue)}input[type=checkbox]{width:auto;accent-color:var(--blue)}
+.controls{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
+button{cursor:pointer;border:0;background:var(--blue);color:#071b36;font-weight:750;min-width:104px}
+button:hover{filter:brightness(1.1)}button.secondary{border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hint,.muted{color:var(--muted);font-size:12px}.hint{margin:10px 0 0}
+#err{display:none;background:#50242d;border:1px solid #b9505e;color:#ffd9dc;border-radius:9px;padding:12px;margin-bottom:14px}
+#view{height:480px;overflow:auto;border-radius:10px;background:#0d1a2b;border:1px solid #26384e;position:relative}
+#note{color:var(--amber);font-size:12px;margin-top:10px;min-height:16px}
+.n rect{stroke-width:2;rx:8;cursor:pointer}.n text{pointer-events:none;fill:#fff;font-size:12px;font-weight:500}.n.sel rect{stroke:#f7d07a;stroke-width:3.5}.n.gone{opacity:.48}
+.edge{fill:none;stroke:#67809e;stroke-width:1.55}.legend{display:flex;flex-wrap:wrap;gap:9px 15px;margin-top:8px}
+.legend span{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+dl{display:grid;grid-template-columns:120px minmax(0,1fr);margin:0;gap:8px 12px}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
+pre{margin:0;color:#c7e4fe;font:12px/1.6 ui-monospace,monospace;white-space:pre-wrap;max-height:195px;overflow:auto}
+.kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.kpi{flex:1;background:var(--panel);padding:9px 12px;border-radius:9px;min-width:130px}
+.kpi strong{font-size:20px;display:block;letter-spacing:-.04em}.kpi span{color:var(--muted);font-size:11px}
+.empty{display:flex;align-items:center;justify-content:center;min-height:100%;color:var(--muted);text-align:center;padding:20px}
+footer{color:var(--muted);font-size:11px;text-align:center;padding:0 16px 20px}
 </style>
 </head>
 <body>
-<header><h1>Task Hierarchy &mdash; /proc/pid</h1><span id="mode" class="mod">...</span>
-<span class="hint">F.CSM302 &bull; Бие даалт 1 &bull; Linux Kernel Module for Task Information</span></header>
+<header><div><h1>Task Hierarchy <span style="color:var(--blue)">/proc/pid</span></h1><div class="subtitle">F.CSM302 · Үйлдлийн систем · Бие даалт 2 · Linux Kernel Module for Task Information</div></div><span id="mode" aria-live="polite">Холбогдож байна...</span></header>
 <main>
 <aside>
- <div class="card"><h2>Оролт</h2>
-  <label for="pid">PID</label><input id="pid" value="1" inputmode="numeric" autocomplete="off">
-  <label for="depth">Доош гүнзгийрэх (descendant depth 0..6)</label><input id="depth" type="number" min="0" max="6" value="2">
-  <label for="max">Дээд тал нь хэдэн node (1..500)</label><input id="max" type="number" min="1" max="500" value="200">
-  <label><input id="auto" type="checkbox" style="width:auto"> Автоматаар шинэчлэх (2 сек)</label>
-  <button id="go">Харуулах</button><button id="reset" class="sec">Reset</button>
- </div>
- <div class="card"><h2>Туршилтын process</h2>
-  <div class="hint">Бодит мод үүсгэж (sleep процессууд) module-д шалгуулна.</div>
-  <label>Гүн (1..3) / Салаа (1..4)</label>
-  <div style="display:flex;gap:6px"><input id="sd" type="number" min="1" max="3" value="2"><input id="sf" type="number" min="1" max="4" value="2"></div>
-  <button id="spawn">Mод үүсгэх</button><button id="clean" class="sec">Цэвэрлэх</button>
- </div>
- <div class="card"><h2>Төлөв (state)</h2><div class="legend">
-  <span><i style="background:var(--run)"></i>0 RUNNING</span><span><i style="background:var(--slp)"></i>1 INTERRUPTIBLE</span>
-  <span><i style="background:var(--dsk)"></i>2 UNINTERRUPTIBLE</span><span><i style="background:var(--stp)"></i>4/8 STOPPED/TRACED</span>
-  <span><i style="background:var(--zmb)"></i>ZOMBIE/DEAD</span></div>
-  <div class="hint">Node дээр дарахад тэр PID-ээр дахин асууна.</div></div>
+<section class="card"><h2>Процесс хайх</h2>
+<label for="pid">Process ID (PID)</label><input id="pid" value="1" inputmode="numeric" autocomplete="off" aria-label="PID">
+<div class="split"><div><label for="depth">Гүн (0..6)</label><input id="depth" type="number" min="0" max="6" value="2"></div><div><label for="max">Node хязгаар (1..500)</label><input id="max" type="number" min="1" max="500" value="200"></div></div>
+<label><input id="auto" type="checkbox"> Автоматаар шинэчлэх (2 сек)</label>
+<div class="controls"><button id="go">Харуулах</button><button class="secondary" id="reset">Reset</button></div>
+<p class="hint">Node дээр дараад тухайн процессыг дэлгэрэнгүй харах боломжтой.</p></section>
+<section class="card"><h2>Туршилтын процесс</h2><div class="hint">Бодит Linux sleep процессуудаас жижиг tree үүсгэнэ. Ажиллаж буй demo group-ийн дээд хязгаар: 3.</div>
+<div class="split"><div><label for="sd">Гүн (1..3)</label><input id="sd" value="2" min="1" max="3" type="number"></div><div><label for="sf">Fanout (1..4)</label><input id="sf" value="2" min="1" max="4" type="number"></div></div>
+<div class="controls"><button id="spawn">Мод үүсгэх</button><button id="clean" class="secondary">Цэвэрлэх</button></div></section>
+<section class="card"><h2>Процессын төлөв</h2><div class="legend">
+<span><i style="background:#31b58d"></i>RUNNING (0)</span><span><i style="background:#367bd4"></i>SLEEPING (1)</span>
+<span><i style="background:#d98e33"></i>DISK (2)</span><span><i style="background:#817fc6"></i>STOPPED (4/8)</span>
+<span><i style="background:#d6536d"></i>ZOMBIE / DEAD</span></div><p class="hint">Тэмдэглэл: гаднах PID-үүдийн төлөвийг kernel-ээс авна. Зөвхөн сонгосон PID-ийн exit state-ийг тусад нь илрүүлнэ.</p></section>
 </aside>
 <section>
- <div id="err"></div>
- <div class="card"><h2>Task hierarchy</h2><div id="view"></div><div id="note" class="hint"></div></div>
- <div class="card"><h2>Сонгосон task</h2><dl id="info"><dt>-</dt><dd>PID оруулаад "Харуулах" дарна уу</dd></dl></div>
- <div class="card"><h2>Module-ийн түүхий гаралт (cat /proc/pid)</h2><pre id="raw"></pre></div>
-</section>
-</main>
+<div id="err" role="alert"></div>
+<section class="card"><h2>Process Tree · Live visualization</h2><div class="kpis"><div class="kpi"><strong id="nodes">—</strong><span>Дүрсэлсэн node</span></div><div class="kpi"><strong id="queries">—</strong><span>Kernel query</span></div><div class="kpi"><strong id="selected">—</strong><span>Сонгосон PID</span></div></div>
+<div id="view"><div class="empty">PID сонгоод “Харуулах” товчийг дарна уу.</div></div><div id="note"></div></section>
+<div class="split" style="grid-template-columns:1fr 1fr"><section class="card"><h2>Сонгосон task</h2><dl id="info"><dt>—</dt><dd>Мэдээлэл ачаалаагүй</dd></dl></section><section class="card"><h2>/proc/pid raw output</h2><pre id="raw">Мэдээлэл ачаалаагүй</pre></section></div>
+</section></main>
+<footer>Kernel module = real data · MOCK = Linux /proc-based simulation · No pre-filled benchmark claims</footer>
 <script>
 "use strict";
 const $=id=>document.getElementById(id);
-const NS="http://www.w3.org/2000/svg", W=130, H=44, GX=18, GY=56;
-let timer=null;
-function color(n){ if(n.zombie) return "var(--zmb)";
-  switch(n.state){case 0:return"var(--run)";case 1:return"var(--slp)";case 2:return"var(--dsk)";default:return"var(--stp)";}}
-function showErr(m){const e=$("err");e.textContent=m;e.style.display=m?"block":"none";}
-async function api(path,opt){
-  let r; try{ r=await fetch(path,opt);}catch(e){throw new Error("Backend-тэй холбогдож чадсангүй (server.py ажиллаж байна уу?)");}
-  const j=await r.json(); if(!r.ok) throw new Error(j.message||("HTTP "+r.status)); return j;}
-function validate(){
-  const raw=$("pid").value.trim();
-  if(!/^\d+$/.test(raw)) throw new Error(`"${raw}" бүхэл тоо биш. PID нь эерэг бүхэл тоо байна.`);
-  const p=Number(raw); if(p<1||p>4194304) throw new Error(`PID ${p} хүрээнээс гадуур (1..4194304).`);
-  return p;}
-function toFlat(d){ // ancestors chain -> selected -> descendants as one tree
-  let root=d.tree; root.sel=true;
-  for(let i=d.ancestors.length-1;i>=0;i--){const a=d.ancestors[i];
-    root={pid:a.pid,command:a.command,state:a.state,children:[root],anc:true};}
-  return root;}
-function layout(n,depth,ctx){
-  n.depth=depth;
-  if(!n.children.length){n.x=ctx.leaf++*(W+GX);}
-  else{n.children.forEach(c=>layout(c,depth+1,ctx));n.x=(n.children[0].x+n.children[n.children.length-1].x)/2;}
-  ctx.maxd=Math.max(ctx.maxd,depth);}
-function draw(root){
-  const ctx={leaf:0,maxd:0}; layout(root,0,ctx);
-  const w=Math.max(ctx.leaf*(W+GX)+GX,300), h=(ctx.maxd+1)*(H+GY)+GY/2;
-  const svg=document.createElementNS(NS,"svg"); svg.setAttribute("width",w); svg.setAttribute("height",h);
-  const g=document.createElementNS(NS,"g"); g.setAttribute("transform","translate(10,12)"); svg.appendChild(g);
-  (function walk(n){
-    n.children.forEach(c=>{const p=document.createElementNS(NS,"path");
-      const x1=n.x+W/2,y1=n.depth*(H+GY)+H,x2=c.x+W/2,y2=c.depth*(H+GY),m=(y1+y2)/2;
-      p.setAttribute("d",`M${x1},${y1} C${x1},${m} ${x2},${m} ${x2},${y2}`);p.setAttribute("class","edge");g.appendChild(p);walk(c);});
-  })(root);
-  (function walk(n){
-    const e=document.createElementNS(NS,"g"); e.setAttribute("class","n"+(n.sel?" sel":"")+(n.gone?" gone":""));
-    e.setAttribute("transform",`translate(${n.x},${n.depth*(H+GY)})`);
-    const r=document.createElementNS(NS,"rect"); r.setAttribute("width",W); r.setAttribute("height",H);
-    r.setAttribute("fill",color(n)); r.setAttribute("stroke",n.anc?"#888":"transparent");
-    const t1=document.createElementNS(NS,"text"); t1.setAttribute("x",8); t1.setAttribute("y",18); t1.textContent="PID "+n.pid;
-    const t2=document.createElementNS(NS,"text"); t2.setAttribute("x",8); t2.setAttribute("y",35);
-    t2.textContent=(n.command.length>16?n.command.slice(0,15)+"…":n.command)+(n.cut||(n.nchildren>n.children.length&&n.children.length===0&&n.nchildren>0)?"  +":"");
-    const ti=document.createElementNS(NS,"title"); ti.textContent=`${n.command} pid=${n.pid} state=${n.state}`+(n.nchildren!=null?` children=${n.nchildren}`:"");
-    e.append(r,t1,t2,ti); e.addEventListener("click",()=>{$("pid").value=n.pid;go();}); g.appendChild(e);
-    n.children.forEach(walk);
-  })(root);
-  const v=$("view"); v.replaceChildren(svg);}
-function info(d){
-  const rows=[["command",d.tree.command],["pid",d.selected],["state",`${d.tree.state}  (${d.state_name||"?"})`],
-   ["parent",`${d.ppid} (${d.parent_command})`],["ancestors",d.ancestors.map(a=>a.pid+":"+a.command).join(" → ")||"-"],
-   ["children",d.tree.nchildren],["node / query",`${d.nodes} / ${d.queries}`]];
-  const dl=$("info"); dl.replaceChildren(); rows.forEach(([k,v])=>{const a=document.createElement("dt"),b=document.createElement("dd");a.textContent=k;b.textContent=v;dl.append(a,b);});}
-async function go(){
-  try{ showErr(""); const pid=validate();
-    const dep=Number($("depth").value), mx=Number($("max").value);
-    if(!Number.isInteger(dep)||dep<0||dep>6) throw new Error("Гүн 0..6 хооронд байх ёстой.");
-    if(!Number.isInteger(mx)||mx<1||mx>500) throw new Error("Node-ийн дээд тоо 1..500 байх ёстой.");
-    const d=await api(`/api/tree?pid=${pid}&depth=${dep}&max=${mx}`);
-    draw(toFlat(d)); info(d); $("raw").textContent=d.raw;
-    $("note").textContent=d.truncated?"Анхаар: node-ийн дээд хязгаарт хүрсэн тул мод бүрэн биш.":"";
-  }catch(e){showErr(e.message);}}
-function reset(){ $("pid").value="1";$("depth").value=2;$("max").value=200;$("auto").checked=false;setAuto();
-  showErr("");$("view").replaceChildren();$("info").replaceChildren();$("raw").textContent="";$("note").textContent="";}
+const NS="http://www.w3.org/2000/svg",W=138,H=48,GX=20,GY=63;
+let timer=null,serial=0;
+function color(n){if(n.zombie)return"#d6536d";switch(n.state){case 0:return"#31b58d";case 1:return"#367bd4";case 2:return"#d98e33";default:return"#817fc6";}}
+function showErr(message){const e=$("err");e.textContent=message;e.style.display=message?"block":"none";}
+async function api(path,options){let r;try{r=await fetch(path,options);}catch{throw Error("Backend-тэй холбогдох боломжгүй байна.");}const j=await r.json();if(!r.ok)throw Error(j.message||`HTTP ${r.status}`);return j;}
+function validate(){const text=$("pid").value.trim();if(!/^\d+$/.test(text))throw Error("PID нь бүхэл эерэг тоо байх ёстой.");const p=Number(text);if(!Number.isSafeInteger(p)||p<1||p>4194304)throw Error("PID 1..4194304 байх ёстой.");return p;}
+function asTree(data){let root=data.tree;root.sel=true;for(let i=data.ancestors.length-1;i>=0;i--){const p=data.ancestors[i];root={pid:p.pid,command:p.command,state:p.state,children:[root],anc:true};}return root;}
+function layout(n,depth,state){n.depth=depth;if(!n.children?.length){n.x=state.leaf++*(W+GX);}else{n.children.forEach(c=>layout(c,depth+1,state));n.x=(n.children[0].x+n.children[n.children.length-1].x)/2;}state.maxDepth=Math.max(state.maxDepth,depth);}
+function draw(root){const state={leaf:0,maxDepth:0};layout(root,0,state);const width=Math.max(340,state.leaf*(W+GX)+30),height=(state.maxDepth+1)*(H+GY)+30;
+const svg=document.createElementNS(NS,"svg");svg.setAttribute("width",width);svg.setAttribute("height",height);svg.setAttribute("role","img");svg.setAttribute("aria-label","Linux process hierarchy tree");
+const group=document.createElementNS(NS,"g");group.setAttribute("transform","translate(12,14)");svg.append(group);
+(function edges(n){n.children?.forEach(c=>{const path=document.createElementNS(NS,"path");const x1=n.x+W/2,y1=n.depth*(H+GY)+H,x2=c.x+W/2,y2=c.depth*(H+GY),ym=(y1+y2)/2;path.setAttribute("d",`M${x1},${y1} C${x1},${ym} ${x2},${ym} ${x2},${y2}`);path.setAttribute("class","edge");group.append(path);edges(c);});})(root);
+(function nodes(n){const e=document.createElementNS(NS,"g");e.setAttribute("class","n"+(n.sel?" sel":"")+(n.gone?" gone":""));e.setAttribute("transform",`translate(${n.x},${n.depth*(H+GY)})`);
+const r=document.createElementNS(NS,"rect");r.setAttribute("width",W);r.setAttribute("height",H);r.setAttribute("fill",color(n));r.setAttribute("stroke",n.anc?"#8ea9c7":"transparent");
+const line1=document.createElementNS(NS,"text");line1.setAttribute("x",9);line1.setAttribute("y",18);line1.textContent="PID "+n.pid;
+const line2=document.createElementNS(NS,"text");line2.setAttribute("x",9);line2.setAttribute("y",36);line2.textContent=(n.command.length>14?n.command.slice(0,13)+"…":n.command)+(n.cut||n.source_truncated?" +":"");
+const title=document.createElementNS(NS,"title");title.textContent=`${n.command} pid=${n.pid} state=${n.state}`+(n.nchildren!=null?` children=${n.nchildren}`:"");e.append(r,line1,line2,title);
+e.style.cursor="pointer";e.addEventListener("click",()=>{$("pid").value=n.pid;go();});group.append(e);n.children?.forEach(nodes);})(root);
+$("view").replaceChildren(svg);}
+function fillInfo(d){const rows=[["Command",d.tree.command],["PID",d.selected],["State",`${d.tree.state} (${d.state_name||"?"})`],["Parent",`${d.ppid} (${d.parent_command})`],["Ancestors",d.ancestors.map(a=>`${a.pid}: ${a.command}`).join(" → ")||"-"],["Children",d.tree.nchildren],["Node / query",`${d.nodes} / ${d.queries}`]];const dl=$("info");dl.replaceChildren();rows.forEach(([key,value])=>{const dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=key;dd.textContent=value;dl.append(dt,dd);});}
+async function go(){const request=++serial;try{showErr("");const pid=validate(),depth=Number($("depth").value),limit=Number($("max").value);if(!Number.isInteger(depth)||depth<0||depth>6)throw Error("Гүн 0..6 байна.");if(!Number.isInteger(limit)||limit<1||limit>500)throw Error("Node хязгаар 1..500 байна.");const data=await api(`/api/tree?pid=${pid}&depth=${depth}&max=${limit}`);if(request!==serial)return;draw(asTree(data));fillInfo(data);$("raw").textContent=data.raw;$("nodes").textContent=data.nodes;$("queries").textContent=data.queries;$("selected").textContent=data.selected;$("note").textContent=data.truncated?"Анхаар: kernel / node хязгаарын улмаас зарим child харуулагдаагүй.":"";}catch(ex){if(request===serial)showErr(ex.message);}}
 function setAuto(){clearInterval(timer);timer=null;if($("auto").checked)timer=setInterval(go,2000);}
-$("go").onclick=go;$("reset").onclick=reset;$("auto").onchange=setAuto;
-$("pid").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
-$("spawn").onclick=async()=>{try{showErr("");
-  const r=await api(`/api/spawn?depth=${$("sd").value}&fanout=${$("sf").value}`,{method:"POST"});
-  $("pid").value=r.pid; setTimeout(go,300);}catch(e){showErr(e.message);}};
-$("clean").onclick=async()=>{try{await api("/api/cleanup",{method:"POST"});$("note").textContent="Туршилтын process-уудыг зогсоолоо.";}catch(e){showErr(e.message);}};
-api("/api/info").then(i=>{const m=$("mode");
-  if(i.mode==="mock"){m.textContent="MOCK горим (kernel module биш)";m.className="mck";}
-  else{m.textContent="Kernel module: "+i.proc;m.className="mod";}}).catch(()=>{$("mode").textContent="backend алга";});
+function reset(){serial++;$("pid").value=1;$("depth").value=2;$("max").value=200;$("auto").checked=false;setAuto();showErr("");$("view").innerHTML='<div class="empty">PID сонгоод “Харуулах” товчийг дарна уу.</div>';$("info").replaceChildren();$("raw").textContent="";$("note").textContent="";["nodes","queries","selected"].forEach(k=>$(k).textContent="—");}
+$("go").onclick=go;$("reset").onclick=reset;$("auto").onchange=setAuto;$("pid").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
+$("spawn").onclick=async()=>{try{showErr("");const data=await api(`/api/spawn?depth=${$("sd").value}&fanout=${$("sf").value}`,{method:"POST"});$("pid").value=data.pid;setTimeout(go,400);}catch(ex){showErr(ex.message);}};
+$("clean").onclick=async()=>{try{const result=await api("/api/cleanup",{method:"POST"});$("note").textContent=`${result.killed_groups} туршилтын process group цэвэрлэв.`;}catch(ex){showErr(ex.message);}};
+api("/api/info").then(i=>{const badge=$("mode");if(i.mode==="mock"){badge.textContent="MOCK · /proc simulation";badge.classList.add("mock");}else{badge.textContent="LIVE KERNEL · "+i.proc;} }).catch(()=>{$("mode").textContent="BACKEND OFFLINE";});
 </script>
 </body>
 </html>
