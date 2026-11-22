@@ -1,0 +1,16 @@
+{
+  "checked_at_utc": "2026-11-21T06:22:47+00:00",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "kernel": "6.18.57",
+  "python": "3.13.5",
+  "mode": "MOCK backed by real /proc; NOT kernel module",
+  "test_suite": "tests/test_bd2_api.py",
+  "tests_ran": 21,
+  "passed": 21,
+  "failed": 0,
+  "errors": 0,
+  "baseline_main_sha": "0cb46da0c42eefd69121b81e9a889071bc309eb9",
+  "github_write": "403 forbidden; no branch/push/release created",
+  "screenshot": "real_mock_ui.png",
+  "snapshot_note": "Screenshot of updated UI running with live Linux /proc mock API responses in a headless browser. Browser proxy was used only because local browser network access was blocked."
+}
